@@ -1,0 +1,8 @@
+dist/
+
+node_modules/
+
+npm-debug.log
+
+src/helpers.d.ts
+src/helpers.js

@@ -1,0 +1,31 @@
+{
+	"name": "async-build",
+	"version": "0.1.0",
+	"description": "A thin build system built around caolan/async.",
+	"keywords": ["build"],
+	"homepage": "https://github.com/Arnavion/async-build",
+	"bugs": "https://github.com/Arnavion/async-build/issues",
+	"license": "Apache-2.0",
+	"contributors": [{
+		"name": "Arnav Singh",
+		"email": "arnavion@gmail.com"
+	}],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Arnavion/async-build"
+	},
+	"main": "lib/async-build.js",
+	"scripts": {
+		"prepublish": "node ./build.js clean default",
+		"build": "tsc ./src/helpers.ts ./src/typings.d.ts -m commonjs -t es5 -noImplicitAny -d"
+	},
+	"peerDependencies": {
+		"async": "0.9.x"
+	},
+	"devDependencies": {
+		"async": "0.9.x",
+		"npm": "2.x",
+		"typescript": "1.5.0-beta"
+	},
+	"private": true
+}

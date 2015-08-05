@@ -81,7 +81,7 @@ function task(name, deps, body) {
 		async.waterfall([originalBody, handleTaskResult], function (err) {
 			if (err) {
 				console.error("[" + new Date().toLocaleTimeString() + "] " + name + " - Failed");
-				callback(err, null);
+				callback(err);
 				return;
 			}
 
@@ -124,7 +124,7 @@ task.runArgv = function (callback) {
 					console.error(err.stack || err);
 				}
 
-				callback(err, null);
+				callback(err);
 			});
 		};
 	}), callback);

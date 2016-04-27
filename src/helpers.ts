@@ -168,7 +168,7 @@ class FileSource extends Readable<File | Error> {
 		}
 
 		var filename = this._files[this._numRead++];
-		fs.readFile(filename, { encoding: "utf8" }, (err, data) => {
+		fs.readFile(filename, "utf8", (err, data) => {
 			if (err) {
 				this.push(err);
 				this._numRead = this._files.length;
@@ -199,7 +199,7 @@ class FileDest extends Transform<File | Error, File | Error> {
 				return;
 			}
 
-			fs.writeFile(outputPath, file.contents, { encoding: "utf8" }, err => {
+			fs.writeFile(outputPath, file.contents, "utf8", err => {
 				if (err) {
 					callback(err);
 					return;

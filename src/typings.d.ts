@@ -24,11 +24,8 @@
 // Definitions: https://github.com/borisyankov/DefinitelyTyped
 
 interface Buffer { }
-declare var Buffer: {
-	new (str: string): Buffer;
-	prototype: Buffer;
-	concat(list: Buffer[]): Buffer;
-};
+interface BufferConstructor { }
+declare var Buffer: BufferConstructor;
 
 declare var process: {
 	cwd(): string;
@@ -37,12 +34,12 @@ declare var process: {
 declare module "fs" {
 	export function mkdir(path: string, callback: (err: { code: string }) => void): void;
 	export function readdirSync(path: string): string[];
-	export function readFile(filename: string, options: { encoding: string }, callback: (err: any, data: string) => void): void;
+	export function readFile(filename: string, encoding: string, callback: (err: any, data: string) => void): void;
 	export function stat(path: string, callback: (err: any, stats: Stats) => void): void;
 	export function statSync(path: string): Stats;
-	export function unwatchFile(filename: string, listener?: (curr: Stats, prev: Stats) => void): void;
-	export function watchFile(filename: string, options: { interval?: number }, listener: (curr: Stats, prev: Stats) => void): void;
-	export function writeFile(filename: string, data: any, options: { encoding: string }, callback: (err: any) => void): void;
+	export function unwatchFile(filename: string, listener: (curr: Stats, prev: Stats) => void): void;
+	export function watchFile(filename: string, options: { interval: number }, listener: (curr: Stats, prev: Stats) => void): void;
+	export function writeFile(filename: string, data: any, encoding: string, callback: (err: any) => void): void;
 
 	interface Stats {
 		isDirectory(): boolean;
@@ -62,13 +59,12 @@ declare module "stream" {
 	export class Readable<T> {
 		constructor(opts: { objectMode: boolean; });
 
-		_read(): void;
-		emit(event: string, ...args: any[]): boolean;
+		_read(size: number): void;
 		push(chunk: T): boolean;
 	}
 
 	export class Transform<TIn, TOut> {
-		constructor(opts: { objectMode?: boolean; });
+		constructor(opts: { objectMode: boolean; });
 
 		_transform(chunk: TIn, encoding: string, callback: (error?: Error) => void): void;
 		_flush(callback: (error?: Error) => void): void;

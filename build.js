@@ -19,109 +19,96 @@
  */
 
 var async = require("async");
+var fs = require("fs");
+var path = require("path");
+
+var task = require("./src/task");
+
+var inputFiles = [
+	"./README.md", "./LICENSE",
+	"./src/task.js", "./src/helpers.js"
+];
+
+var files = Object.create(null);
+inputFiles.forEach(function (filename) {
+	files["./dist/" + path.basename(filename)] = filename;
+});
 
 async.series([
-	function (callback) {
-		var npm = require("npm");
+	// Clean dist/
+	task.clean(Object.keys(files).concat(["./dist/package.json"])),
 
-		npm.load(function () {
-			npm.commands["run-script"](["build"], callback);
+	// Create dist/ if necessary
+	function (callback) {
+		fs.mkdir("./dist", function (err) {
+			if (err && err.code !== "EEXIST") {
+				callback(err);
+				return;
+			}
+
+			callback(null);
 		});
 	},
 
-	function (callback) {
-		var fs = require("fs");
-		var path = require("path");
+	// Copy all files except package.json and typings.d.ts
+	async.forEachOf.bind(async, files, function (inputFilename, outputFilename, callback) {
+		async.waterfall([fs.readFile.bind(fs, inputFilename), fs.writeFile.bind(fs, outputFilename)], callback);
+	}),
 
-		var task = require("./src/task");
+	// Copy package.json
+	async.waterfall.bind(async, [
+		fs.readFile.bind(fs, "./package.json"),
+		function (data, callback) {
+			try {
+				var packageJson = JSON.parse(data);
+				packageJson.devDependencies = undefined;
+				packageJson.private = undefined;
+				packageJson.scripts = undefined;
+				packageJson.main = "task.js";
+			}
+			catch (ex) {
+				callback(ex, null);
+				return;
+			}
 
-		var inputFiles = [
-			"./README.md", "./LICENSE",
-			"./src/task.js", "./src/helpers.js"
-		];
+			callback(null, new Buffer(JSON.stringify(packageJson, null, "\t")));
+		},
+		fs.writeFile.bind(fs, "./dist/package.json")
+	]),
 
-		var files = Object.create(null);
-		inputFiles.forEach(function (filename) {
-			files["./dist/" + path.basename(filename)] = filename;
-		});
+	// Copy typings.d.ts
+	async.waterfall.bind(async, [
+		async.parallel.bind(async, [
+			fs.readFile.bind(fs, "./src/helpers.d.ts", "utf8"),
+			fs.readFile.bind(fs, "./src/typings.d.ts", "utf8")
+		]),
+		function (fileContents, callback) {
+			try {
+				var helpersDTs = fileContents[0];
+				var typingsDTs = fileContents[1];
 
-		async.series([
-			// Clean dist/
-			task.clean(Object.keys(files).concat(["./dist/package.json"])),
+				helpersDTs =
+					'declare module "async-build" {\n' +
+					helpersDTs.split("\n")
+						.map(function (line) { return "\t" + line; })
+						.filter(function (line) { return line.match(/^\s*private/) === null })
+						.map(function (line) { line = line.replace("export declare", "export"); return line; })
+						.join("\n") + '\n' +
+					'}';
 
-			// Create dist/ if necessary
-			function (callback) {
-				fs.mkdir("./dist", function (err) {
-					if (err && err.code !== "EEXIST") {
-						callback(err);
-						return;
-					}
+				typingsDTs += "\n\n" + helpersDTs;
+			}
+			catch (ex) {
+				callback(ex, null);
+				return;
+			}
 
-					callback(null);
-				});
-			},
-
-			// Copy all files except package.json and typings.d.ts
-			async.forEachOf.bind(async, files, function (inputFilename, outputFilename, callback) {
-				async.waterfall([fs.readFile.bind(fs, inputFilename), fs.writeFile.bind(fs, outputFilename)], callback);
-			}),
-
-			// Copy package.json
-			async.waterfall.bind(async, [
-				fs.readFile.bind(fs, "./package.json"),
-				function (data, callback) {
-					try {
-						var packageJson = JSON.parse(data);
-						packageJson.devDependencies = undefined;
-						packageJson.private = undefined;
-						packageJson.scripts = undefined;
-						packageJson.main = "task.js";
-					}
-					catch (ex) {
-						callback(ex, null);
-						return;
-					}
-
-					callback(null, new Buffer(JSON.stringify(packageJson, null, "\t")));
-				},
-				fs.writeFile.bind(fs, "./dist/package.json")
-			]),
-
-			// Copy typings.d.ts
-			async.waterfall.bind(async, [
-				async.parallel.bind(async, [
-					fs.readFile.bind(fs, "./src/helpers.d.ts", { encoding: "utf8" }),
-					fs.readFile.bind(fs, "./src/typings.d.ts", { encoding: "utf8" })
-				]),
-				function (fileContents, callback) {
-					try {
-						var helpersDTs = fileContents[0];
-						var typingsDTs = fileContents[1];
-
-						helpersDTs =
-							'declare module "async-build" {\n' +
-							helpersDTs.split("\n")
-								.map(function (line) { return "\t" + line; })
-								.filter(function (line) { return line.match(/^\s*private/) === null })
-								.map(function (line) { line = line.replace("export declare", "export"); return line; })
-								.join("\n") + '\n' +
-							'}';
-
-						typingsDTs += "\n\n" + helpersDTs;
-					}
-					catch (ex) {
-						callback(ex, null);
-						return;
-					}
-
-					callback(null, typingsDTs);
-				},
-				function (typingsDTs, callback) {
-					fs.writeFile("./dist/typings.d.ts", typingsDTs, { encoding: "utf8" }, callback)
-				}
-			]),
-		], callback);
-	}
+			callback(null, typingsDTs);
+		},
+		function (typingsDTs, callback) {
+			fs.writeFile("./dist/typings.d.ts", typingsDTs, "utf8", callback)
+		}
+	]),
 ], function (err) {
 	if (err) {
 		console.error(err.stack || err);

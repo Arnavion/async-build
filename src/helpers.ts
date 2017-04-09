@@ -18,34 +18,34 @@
  * limitations under the License.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { Readable, Transform } from "stream";
+import fs = require("fs");
+import path = require("path");
+import stream = require("stream");
 
 export interface File {
 	path: string;
 	contents: string | Buffer;
 }
 
-export function src(files: string | string[], options?: { relativeTo?: string }): Readable<File> {
+export function src(files: string | string[], options?: { relativeTo?: string }): stream.Readable<File | Error> {
 	if (!Array.isArray(files)) {
-		files = [<string>files];
+		files = [files];
 	}
 
-	return new FileSource(<string[]>files, (options && options.relativeTo) ? path.resolve(options.relativeTo) : process.cwd());
+	return new FileSource(files, (options && options.relativeTo) ? path.resolve(options.relativeTo) : process.cwd());
 }
 
-export function dest(base: string): Transform<File | Error, File | Error> {
+export function dest(base: string): stream.Transform<File | Error, File | Error> {
 	return new FileDest(base);
 }
 
 export function watch(directory: string, onChangeCallback: () => void): FileWatcher {
-	var fileWatcher = new FileWatcher(onChangeCallback);
+	const fileWatcher = new FileWatcher(onChangeCallback);
 
-	var entries = fs.readdirSync(directory);
+	const entries = fs.readdirSync(directory);
 	for (let entry of entries) {
-		var entryName = path.join(directory, entry);
-		var stats = fs.statSync(entryName);
+		const entryName = path.join(directory, entry);
+		const stats = fs.statSync(entryName);
 		if (stats.isFile()) {
 			fileWatcher.watchFile(entryName);
 		}
@@ -57,7 +57,7 @@ export function watch(directory: string, onChangeCallback: () => void): FileWatc
 export class FileWatcher {
 	private _watchedFiles = Object.create(null);
 	private _modifiedFiles = Object.create(null);
-	private _pendingCall: number = null;
+	private _pendingCall: number | null = null;
 
 	constructor(private _onChangeCallback: (fileNames: string[]) => void) { }
 
@@ -66,7 +66,7 @@ export class FileWatcher {
 			return;
 		}
 
-		var watchFileCallback = (currentFile: fs.Stats, previousFile: fs.Stats) => {
+		const watchFileCallback = (currentFile: fs.Stats, previousFile: fs.Stats) => {
 			if (currentFile.mtime.getTime() <= 0) {
 				this._fileChangedCallback(fileName);
 				fs.unwatchFile(fileName, watchFileCallback);
@@ -88,7 +88,7 @@ export class FileWatcher {
 			this._pendingCall = setTimeout(() => {
 				this._pendingCall = null;
 
-				var modifiedFiles = Object.keys(this._modifiedFiles);
+				const modifiedFiles = Object.keys(this._modifiedFiles);
 
 				for (let fileName of modifiedFiles) {
 					delete this._modifiedFiles[fileName];
@@ -100,32 +100,36 @@ export class FileWatcher {
 	}
 }
 
-export class FileTransform extends Transform<File | Error, File | Error> {
-	constructor(transform?: (chunk: File, encoding?: string, callback?: (error?: Error) => void) => void, flush?: (callback?: (error?: Error) => void) => void) {
+export class FileTransform extends stream.Transform<File | Error, File | Error> {
+	constructor(
+		transform?: (this: FileTransform, chunk: File, encoding: string, callback: (error: Error | null) => void) => void,
+		flush?: (this: FileTransform, callback: (error: Error | null) => void) => void
+	) {
 		super({ objectMode: true });
 
-		transform = transform || ((chunk, encoding, callback) => callback());
+		const transform_ = transform || ((chunk, encoding, callback) => callback(null));
 
-		var originalTransform = (transform.length < 3) ?
-			(chunk: File, encoding: string, callback: (error: Error) => void) => {
-				try {
-					transform.call(this, chunk, encoding);
-					callback(null);
-				}
-				catch (ex) {
-					callback(ex);
-				}
-			} :
-			transform.bind(this);
+		const originalTransform: (chunk: File, encoding: string, callback: (error: Error | null) => void) => void =
+			(transform_.length < 3) ?
+				(chunk, encoding, callback) => {
+					try {
+						transform_.call(this, chunk, encoding);
+						callback(null);
+					}
+					catch (ex) {
+						callback(ex);
+					}
+				} :
+				transform_.bind(this);
 
-		this._transform = (chunk: File | Error, encoding: string, callback: (error?: Error) => void) => {
+		this._transform = (chunk, encoding, callback) => {
 			if (chunk instanceof Error) {
 				this.push(chunk);
 
 				callback(null);
 			}
 			else {
-				originalTransform(chunk, encoding, (err: Error) => {
+				originalTransform(chunk, encoding, err => {
 					if (err) {
 						this.push(err);
 					}
@@ -135,26 +139,24 @@ export class FileTransform extends Transform<File | Error, File | Error> {
 			}
 		};
 
-		flush = flush || (callback => callback());
+		const flush_ = flush || (callback => callback(null));
 
-		if (flush.length < 1) {
-			this._flush = ((callback: (error?: Error) => void) => {
-				try {
-					flush.call(this);
-					callback(null);
-				}
-				catch (ex) {
-					callback(ex);
-				}
-			});
-		}
-		else {
-			this._flush = flush.bind(this);
-		}
+		this._flush =
+			(flush_.length < 1) ?
+				((callback: (error: Error | null) => void) => {
+					try {
+						flush_.call(this);
+						callback(null);
+					}
+					catch (ex) {
+						callback(ex);
+					}
+				}) :
+				flush_.bind(this);
 	}
 }
 
-class FileSource extends Readable<File | Error> {
+class FileSource extends stream.Readable<File | Error> {
 	private _numRead: number = 0;
 
 	constructor(private _files: string[], private _relativeTo: string) {
@@ -167,7 +169,7 @@ class FileSource extends Readable<File | Error> {
 			return;
 		}
 
-		var filename = this._files[this._numRead++];
+		const filename = this._files[this._numRead++];
 		fs.readFile(filename, "utf8", (err, data) => {
 			if (err) {
 				this.push(err);
@@ -180,43 +182,42 @@ class FileSource extends Readable<File | Error> {
 	}
 }
 
-class FileDest extends Transform<File | Error, File | Error> {
+class FileDest extends stream.Transform<File | Error, File | Error> {
 	constructor(private _base: string) {
 		super({ objectMode: true });
 	}
 
-	_transform(chunk: File | Error, encoding: string, callback: (error: Error) => void) {
+	_transform(chunk: File | Error, encoding: string, callback: (error: Error | null) => void) {
 		if (chunk instanceof Error) {
 			callback(chunk);
 			return;
 		}
 
-		var file = <File>chunk;
-		var outputPath = path.join(this._base, path.relative(process.cwd(), file.path));
+		const outputPath = path.join(this._base, path.relative(process.cwd(), chunk.path));
 		mkdirp(path.dirname(outputPath), err => {
 			if (err) {
 				callback(err);
 				return;
 			}
 
-			fs.writeFile(outputPath, file.contents, "utf8", err => {
+			fs.writeFile(outputPath, chunk.contents, "utf8", err => {
 				if (err) {
 					callback(err);
 					return;
 				}
 
-				this.push(file);
+				this.push(chunk);
 				callback(null);
 			});
 		});
 	}
 }
 
-function mkdirp(directory: string, callback: (error: any) => void) {
+function mkdirp(directory: string, callback: (error: Error | null) => void) {
 	fs.mkdir(directory, err => {
 		if (err) {
 			if (err.code === "ENOENT") {
-				var parent = path.dirname(directory);
+				const parent = path.dirname(directory);
 				if (parent !== directory) {
 					mkdirp(parent, err => {
 						if (err) {
@@ -239,7 +240,7 @@ function mkdirp(directory: string, callback: (error: any) => void) {
 					}
 
 					if (!stats.isDirectory()) {
-						callback(new Error(directory + " already exists and is not a directory."));
+						callback(new Error(`${ directory } already exists and is not a directory.`));
 						return;
 					}
 

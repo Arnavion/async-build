@@ -1,6 +1,6 @@
 {
 	"name": "async-build",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "A thin build system built around caolan/async.",
 	"keywords": ["build"],
 	"homepage": "https://github.com/Arnavion/async-build",
@@ -14,17 +14,16 @@
 		"type": "git",
 		"url": "https://github.com/Arnavion/async-build"
 	},
-	"main": "lib/async-build.js",
 	"scripts": {
 		"prepublish": "npm run build",
-		"build": "tsc ./src/helpers.ts ./src/typings.d.ts -m commonjs -t es5 -noImplicitAny -d && node ./build.js clean default"
+		"build": "tsc -p ./src && node ./build.js"
 	},
 	"peerDependencies": {
 		"async": "1.x >=1.4"
 	},
 	"devDependencies": {
 		"async": "1.x >=1.4",
-		"typescript": "1.8.10"
+		"typescript": "2.0.10"
 	},
 	"private": true
 }

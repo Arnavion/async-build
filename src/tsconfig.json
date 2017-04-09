@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"forceConsistentCasingInFileNames": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitAny": true,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": false,
+		"strictNullChecks": true,
+
+		"target": "es5",
+		"declaration": true,
+		"module": "commonjs",
+		"moduleResolution": "classic",
+		"noImplicitUseStrict": false,
+		"types": []
+	},
+
+	"files": [
+		"./helpers.ts",
+		"./typings.d.ts"
+	]
+}

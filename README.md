@@ -1,4 +1,6 @@
-[![Build Status](https://travis-ci.org/Arnavion/async-build.png?branch=master)](https://travis-ci.org/Arnavion/async-build)
+This package is no longer maintained.
+
+---
 
 async-build is a simple build system built around caolan/async - essentially a thin wrapper around async.auto
 

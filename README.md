@@ -1,5 +1,7 @@
 This package is no longer maintained.
 
+If you have questions about this repository, open an issue at https://github.com/Arnavion/archived-repos-issues
+
 ---
 
 async-build is a simple build system built around caolan/async - essentially a thin wrapper around async.auto
